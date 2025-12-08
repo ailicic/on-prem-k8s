@@ -13,12 +13,10 @@ data:
   prometheus.yml: |
     global:
       scrape_interval: 15s
-
     scrape_configs:
       - job_name: "prometheus"
         static_configs:
           - targets: ["prometheus.monitoring.svc.cluster.local:9090"]
-
       - job_name: "node-exporter"
         static_configs:
           - targets: ["node-exporter.monitoring.svc.cluster.local:9100"]
@@ -47,9 +45,11 @@ spec:
           args:
             - "--config.file=/etc/prometheus/prometheus.yml"
             - "--storage.tsdb.path=/prometheus"
+            # serve from /prometheus so static files load
+            - "--web.external-url=http://192.168.56.200/prometheus"
+            - "--web.route-prefix=/prometheus"
           ports:
-            - name: http
-              containerPort: 9090
+            - containerPort: 9090
           volumeMounts:
             - name: config
               mountPath: /etc/prometheus
@@ -62,7 +62,6 @@ spec:
         - name: data
           emptyDir: {}
 ---
-# PROMETHEUS SERVICE
 apiVersion: v1
 kind: Service
 metadata:
@@ -72,8 +71,7 @@ spec:
   selector:
     app: prometheus
   ports:
-    - name: http
-      port: 9090
+    - port: 9090
       targetPort: 9090
 ---
 # GRAFANA DEPLOYMENT
@@ -102,11 +100,14 @@ spec:
               value: admin
             - name: GF_SECURITY_ADMIN_PASSWORD
               value: admin
+            # serve under /grafana
+            - name: GF_SERVER_ROOT_URL
+              value: "%(protocol)s://%(domain)s/grafana"
+            - name: GF_SERVER_SERVE_FROM_SUB_PATH
+              value: "true"
           ports:
-            - name: http
-              containerPort: 3000
+            - containerPort: 3000
 ---
-# GRAFANA SERVICE
 apiVersion: v1
 kind: Service
 metadata:
@@ -116,11 +117,10 @@ spec:
   selector:
     app: grafana
   ports:
-    - name: http
-      port: 3000
+    - port: 3000
       targetPort: 3000
 ---
-# NODE EXPORTER DAEMONSET
+# NODE EXPORTER (DaemonSet + Service)
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
@@ -145,8 +145,7 @@ spec:
           args:
             - "--path.rootfs=/host"
           ports:
-            - name: metrics
-              containerPort: 9100
+            - containerPort: 9100
               hostPort: 9100
           volumeMounts:
             - name: root
@@ -158,7 +157,6 @@ spec:
             path: /
             type: Directory
 ---
-# NODE EXPORTER SERVICE (for Prometheus)
 apiVersion: v1
 kind: Service
 metadata:
@@ -168,11 +166,10 @@ spec:
   selector:
     app: node-exporter
   ports:
-    - name: metrics
-      port: 9100
+    - port: 9100
       targetPort: 9100
 ---
-# HTTPROUTE FOR PROMETHEUS (HOST-BASED)
+# HTTPROUTE FOR PROMETHEUS
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
@@ -180,17 +177,19 @@ metadata:
   namespace: monitoring
 spec:
   parentRefs:
-    - name: traefik-gateway       # your Traefik Gateway name
-      namespace: traefik-gateway  # Gateway namespace
-      sectionName: web            # listener name
-  hostnames:
-    - prometheus.local
+    - name: traefik-gateway
+      namespace: traefik-gateway
+      sectionName: web
   rules:
-    - backendRefs:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /prometheus
+      backendRefs:
         - name: prometheus
           port: 9090
 ---
-# HTTPROUTE FOR GRAFANA (HOST-BASED)
+# HTTPROUTE FOR GRAFANA
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
@@ -201,9 +200,11 @@ spec:
     - name: traefik-gateway
       namespace: traefik-gateway
       sectionName: web
-  hostnames:
-    - grafana.local
   rules:
-    - backendRefs:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /grafana
+      backendRefs:
         - name: grafana
           port: 3000
