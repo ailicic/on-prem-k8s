@@ -20,7 +20,7 @@ data:
           - targets: ["prometheus.monitoring.svc.cluster.local:9090"]
       - job_name: 'kube-state-metrics'
         static_configs:
-          - targets: ['kube-state-metrics.kube-state-metrics.svc.cluster.local:8080']
+          - targets: ['kube-state-metrics.monitoring.svc.cluster.local:8080']
 
       - job_name: "node-exporter"
         static_configs:
