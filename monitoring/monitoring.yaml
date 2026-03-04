@@ -38,7 +38,7 @@ subjects:
   - kind: ServiceAccount
     name: prometheus
     namespace: monitoring
----
+---s
 # PROMETHEUS CONFIG
 apiVersion: v1
 kind: ConfigMap
