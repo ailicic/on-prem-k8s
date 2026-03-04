@@ -201,10 +201,22 @@ spec:
           volumeMounts:
             - name: grafana-data
               mountPath: /var/lib/grafana
+            - name: grafana-dashboards
+              mountPath: /var/lib/grafana/dashboards
+              readOnly: true
+            - name: grafana-provisioning
+              mountPath: /etc/grafana/provisioning/dashboards
+              readOnly: true
       volumes:
         - name: grafana-data
           persistentVolumeClaim:
             claimName: grafana-data
+        - name: grafana-dashboards
+          configMap:
+            name: grafana-dashboard-argocd
+        - name: grafana-provisioning
+          configMap:
+            name: grafana-dashboard-provisioning
 ---
 apiVersion: v1
 kind: Service
