@@ -99,10 +99,10 @@ data:
         relabel_configs:
           - action: keep
             source_labels: [__meta_kubernetes_namespace]
-            regex: argo
+            regex: argocd
           - action: keep
             source_labels: [__meta_kubernetes_service_name]
-            regex: argocd(-.*)?-metrics
+            regex: argocd-metrics|argocd-.*-metrics
           - action: replace
             source_labels: [__meta_kubernetes_service_name]
             target_label: job
